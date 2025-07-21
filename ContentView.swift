@@ -8,69 +8,260 @@
 import SwiftUI
 import Charts
 
-struct ContentView: View {
-    @State private var weekData = ScreenTimeValue.week.makeDayValues()
-    @State private var selectedDate: Date = date(year: 2022, month: 06, day: 20)
-    @State private var path = NavigationPath()
+enum ChartType {
+    case line, bar, pie
+}
 
+struct SpendingTrackerView: View {
+    @State private var currentChart: ChartType = .bar
+    
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack {
             VStack {
-                Image(systemName: "globe")
-                    .imageScale(.large)
-                    .foregroundStyle(.tint)
-                Text("Hello, world!")
-                    
-                Chart {
-                    ForEach(weekData) { category in
-                        let isSelected = Calendar.current.isDate(category.valueDate, inSameDayAs: selectedDate)
-                        BarMark(
-                            x: .value("date", category.valueDate, unit: .day),
-                            y: .value("duration", category.duration)
-                        ).opacity(isSelected ? 1 : 0.3)
-                        //.foregroundStyle(by: .value("category", isSelected ? category.category : ScreenTimeCategory.other))
+                HStack(alignment: .bottom){
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Spending tracker")
+                            .font(.headline).padding(.bottom, 5)
+                        Text("March spending")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        Text("$5,270.58")
+                            .font(.title)
+                            .bold()
+                        
+                    }.background(Color.clear)
+                    Spacer()
+                    HStack() {
+                        Button("Bar") {
+                            currentChart = .bar
+                        }.buttonStyle(.bordered)
+                        
+                        Button("Line") {
+                            currentChart = .line
+                        }.buttonStyle(.bordered)
                     }
-                    
-                    .foregroundStyle(.green)
-                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [3, 5]))
-                    
+                    .background(Color.clear)
+                }.padding(.bottom, 20)
+                    .frame(maxWidth: .infinity, alignment: .leading).background(Color.clear)
+                if currentChart == .bar {
+                    SpendingChartView()
+                } else {
+                    SpendingLineChartView()
                 }
-                .chartOverlay { proxy in
-                    
-                    GeometryReader { geo in
-                        Rectangle().fill(.clear).contentShape(Rectangle())
-                            .gesture(
-                                DragGesture(minimumDistance: 0)
-                                    .onChanged { value in
-                                        let x = value.location.x - geo[proxy.plotAreaFrame].origin.x
-                                        if let date: Date = proxy.value(atX: x) {
-                                            selectedDate = Calendar.current.startOfDay(for: date)
-                                            path.append("t")
-                                        }
-                                    }
-                            )
-                    }
-                }
+                Spacer()
                 
-            }.navigationDestination(for: String.self) { item in
-                DetailsView(selectedDate: selectedDate)
+                TransactionListView().padding(.top, 20)
+
             }
-            .padding()
+            
+            
+                
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(Color.clear)
+                
+                .navigationTitle("Navigation").toolbarBackground(Color.blue, for: .navigationBar)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarBackground(
+                    Color.green,
+                    for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
         }
     }
 }
 
-struct DetailsView: View {
-    @State var selectedDate: Date
+struct SpendingChartView: View {
+
+    @State var rawSelectedDate: Date?
+    var selectedViewMonth: ViewMonth? {
+        guard let rawSelectedDate else { return nil }
+        return ViewMonth.mockData.first {
+            Calendar.current.isDate(rawSelectedDate, equalTo: $0.date, toGranularity: .month)
+        }
+    }
+    
     var body: some View {
-            ZStack {
-                Text("DetailsView \(selectedDate)")
+        VStack(alignment: .center) {
+            
+            Chart {
+                ForEach(ViewMonth.mockData) { viewMonth in
+                    BarMark(
+                        x: .value("Month", viewMonth.date, unit: .month),
+                        y: .value("Views", viewMonth.viewCount)
+                    )
+                    .foregroundStyle(Color.green.gradient)
+                    .opacity(rawSelectedDate == nil || viewMonth.date == selectedViewMonth?.date ? 1 : 0.3)
+                }
             }
+            .frame(height: 200)
+            .chartOverlay { proxy in
+                
+                GeometryReader { geo in
+                    Rectangle().fill(.clear).contentShape(Rectangle())
+                        .onTapGesture { value in
+                            let x = value.x - geo[proxy.plotAreaFrame].origin.x
+                            if let date: Date = proxy.value(atX: x) {
+                                rawSelectedDate = Calendar.current.startOfDay(for: date)
+
+                            }
+                        }
+                }
+            }
+            
+            NavigationLink("See More") {
+                
+            }
+        }
+
+        .background(Color.white)
     }
 }
 
+struct SpendingLineChartView: View {
+   
+    @State var rawSelectedDate: Date?
+    var selectedViewMonth: ViewMonth? {
+        guard let rawSelectedDate else { return nil }
+        return ViewMonth.mockData.first {
+            Calendar.current.isDate(rawSelectedDate, equalTo: $0.date, toGranularity: .month)
+        }
+    }
+    
+    var body: some View {
+        VStack(alignment: .center) {
+            
+            Chart {
+                ForEach(ViewMonth.mockData) { viewMonth in
+                    LineMark(
+                        x: .value("Month", viewMonth.date, unit: .month),
+                        y: .value("Views", viewMonth.viewCount)
+                    ).interpolationMethod(.catmullRom)
+                    .foregroundStyle(Color.green.gradient)
+                    .lineStyle(.init(lineWidth: 2))
+                    .symbol {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 8, height: 8)
+                            .offset(y: 0)
+                    }
+                }
+            }
+            .frame(height: 200)
+            
+            .chartOverlay { proxy in
+                
+                GeometryReader { geo in
+                    Rectangle().fill(.clear).contentShape(Rectangle())
+                        .onTapGesture { value in
+                            let x = value.x - geo[proxy.plotAreaFrame].origin.x
+                            if let date: Date = proxy.value(atX: x) {
+                                rawSelectedDate = Calendar.current.startOfDay(for: date)
+
+                            }
+                        }
+                }
+            }
+
+            NavigationLink("See More") {
+                
+            }
+        }
+
+        .background(Color.white)
+    }
+}
+
+struct TransactionListView: View {
+    var body: some View {
+        VStack(alignment: .leading) {
+            SegmentedView().frame(width: 200).padding(.bottom, 16)
+            ScrollView {
+                VStack(spacing: 16) {
+                    TransactionRow(icon: "cart.fill", title: "Amazon", status: "Pending", amount: "$00,000.00", date: nil)
+                    TransactionRow(icon: "bag.fill", title: "Target", status: "Today", amount: "$00,000.00", date: nil)
+                    TransactionRow(icon: "arrow.down.circle", title: "Deposit", status: "Feb 22", amount: "$500.00", date: nil)
+                    TransactionRow(icon: "arrow.left.arrow.right", title: "Transfer from *3423", status: "Feb 22", amount: "$00,000.00", date: nil)
+                    TransactionRow(icon: "cart.fill", title: "Amazon", status: "Pending", amount: "$00,000.00", date: nil)
+                    TransactionRow(icon: "bag.fill", title: "Target", status: "Today", amount: "$00,000.00", date: nil)
+                    TransactionRow(icon: "arrow.down.circle", title: "Deposit", status: "Feb 22", amount: "$500.00", date: nil)
+                    TransactionRow(icon: "arrow.left.arrow.right", title: "Transfer from *3423", status: "Feb 22", amount: "$00,000.00", date: nil)
+                }
+            }
+            
+        }
+    }
+}
+
+struct TransactionRow: View {
+    var icon: String
+    var title: String
+    var status: String
+    var amount: String
+    var date: String?
+
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .frame(width: 32, height: 32)
+                .background(Color.gray.opacity(0.2))
+                .clipShape(Circle())
+            VStack(alignment: .leading) {
+                Text(title)
+                    .font(.body)
+                Text(status)
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            Spacer()
+            VStack(alignment: .trailing) {
+                Text(amount)
+                    .font(.body)
+                Text("$00.00")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+            }
+        }
+    }
+}
+
+struct SegmentedView: View {
+
+    let segments: [String] = ["Latest", "Schedule"]
+    @State private var selected: String = "Latest"
+    @Namespace var name
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(segments, id: \.self) { segment in
+                Button {
+                    selected = segment
+                } label: {
+                    VStack {
+                        Text(segment)
+                            .font(.footnote)
+                            .fontWeight(.medium)
+                            .foregroundColor(selected == segment ? .green : Color(uiColor: .systemGray))
+                        ZStack {
+                            Capsule()
+                                .fill(Color.clear)
+                                .frame(height: 4)
+                            if selected == segment {
+                                Capsule()
+                                    .fill(Color.green)
+                                    .frame(height: 4)
+                                    .matchedGeometryEffect(id: "Tab", in: name)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 #Preview {
-    ContentView()
+    SpendingTrackerView()
 }
 enum ScreenTimeCategory: String, Plottable {
     case social = "Social"
@@ -202,10 +393,10 @@ extension ScreenTimeValue {
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 18), category: .social, duration: 16*60),
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 18), category: .entertainment, duration: 29*60),
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 18), category: .productivityFinance, duration: 12*60),
-        // 7 PM
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 19), category: .social, duration: 9*60),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 19), category: .entertainment, duration: 5*60),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 19), category: .other, duration: 60),
+//        // 7 PM
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 19), category: .social, duration: 9*60),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 19), category: .entertainment, duration: 5*60),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 19), category: .other, duration: 60),
         // 8 PM
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 20), category: .social, duration: 10*60),
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 21, hour: 20), category: .productivityFinance, duration: 17*60),
@@ -251,13 +442,13 @@ extension ScreenTimeValue {
         // 2 PM
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 14), category: .social, duration: 6*60),
         // 3 PM
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 15), category: .social, duration: 5*60),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 15), category: .entertainment, duration: 30),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 15), category: .other, duration: 2*60),
-        // 4 PM
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 16), category: .social, duration: 38*60),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 16), category: .entertainment, duration: 60),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 16), category: .other, duration: 3*60),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 15), category: .social, duration: 5*60),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 15), category: .entertainment, duration: 30),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 15), category: .other, duration: 2*60),
+//        // 4 PM
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 16), category: .social, duration: 38*60),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 16), category: .entertainment, duration: 60),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 16), category: .other, duration: 3*60),
         // 5 PM
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 17), category: .social, duration: 27*60),
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 22, hour: 17), category: .entertainment, duration: 20*60),
@@ -413,14 +604,14 @@ extension ScreenTimeValue {
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 00), category: .other, duration: 33*60),
         // 1 AM
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 01), category: .social, duration: 16*60),
-        // 6 AM
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 06), category: .social, duration: 12*60),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 06), category: .other, duration: 2*60),
-        // 7 AM
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 07), category: .social, duration: 32*60),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 07), category: .entertainment, duration: 2*60),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 07), category: .productivityFinance, duration: 30),
-        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 07), category: .other, duration: 2*60),
+//        // 6 AM
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 06), category: .social, duration: 12*60),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 06), category: .other, duration: 2*60),
+//        // 7 AM
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 07), category: .social, duration: 32*60),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 07), category: .entertainment, duration: 2*60),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 07), category: .productivityFinance, duration: 30),
+//        ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 07), category: .other, duration: 2*60),
         // 8 AM
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 08), category: .social, duration: 15*60),
         ScreenTimeValue(valueDate: date(year: 2022, month: 06, day: 25, hour: 08), category: .entertainment, duration: 30),
@@ -584,5 +775,35 @@ extension Date {
         components.second = -second
         components.nanosecond = -nanosecond
         return Calendar.current.date(byAdding: components, to: self)
+    }
+}
+
+struct ViewMonth: Identifiable {
+    let id = UUID()
+    let date: Date
+    let viewCount: Int
+
+
+    static let mockData: [ViewMonth] = [
+        .init(date: Date.from(year: 2024, month: 1, day: 1), viewCount: 55000),
+        .init(date: Date.from(year: 2024, month: 2, day: 1), viewCount: 89000),
+        .init(date: Date.from(year: 2024, month: 3, day: 1), viewCount: 64000),
+        .init(date: Date.from(year: 2024, month: 4, day: 1), viewCount: 79000),
+        .init(date: Date.from(year: 2024, month: 5, day: 1), viewCount: 130000),
+        .init(date: Date.from(year: 2024, month: 6, day: 1), viewCount: 90000),
+        .init(date: Date.from(year: 2024, month: 7, day: 1), viewCount: 88000),
+        .init(date: Date.from(year: 2024, month: 8, day: 1), viewCount: 64000),
+        .init(date: Date.from(year: 2024, month: 9, day: 1), viewCount: 74000),
+        .init(date: Date.from(year: 2024, month: 10, day: 1), viewCount: 99000),
+        .init(date: Date.from(year: 2024, month: 11, day: 1), viewCount: 110000),
+        .init(date: Date.from(year: 2024, month: 12, day: 1), viewCount: 94000)
+    ]
+}
+
+
+extension Date {
+    static func from(year: Int, month: Int, day: Int) -> Date {
+        let components = DateComponents(year: year, month: month, day: day)
+        return Calendar.current.date(from: components)!
     }
 }
