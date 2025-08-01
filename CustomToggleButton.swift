@@ -27,9 +27,10 @@ struct CustomToggleButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
-            buttonImageContent
-        }
-        .buttonStyle(PlainButtonStyle()) // Remove default button styling if desired
+//        Button(action: action) {
+//            buttonImageContent
+//        }
+        Button(buttonData.name, action: action)
+            .buttonStyle(.bordered) // Remove default button styling if desired
     }
 }
